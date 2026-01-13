@@ -40,6 +40,9 @@ Task.hasMany(TaskHistory, { foreignKey: 'taskId' });
 TaskHistory.belongsTo(Task, { foreignKey: 'taskId' });
 
 const PORT = 8080;
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 app.listen(PORT, async () => {
     console.log(`Serverul a pornit pe portul ${PORT}`);
     try {
