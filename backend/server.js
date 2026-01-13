@@ -42,6 +42,10 @@ TaskHistory.belongsTo(Task, { foreignKey: 'taskId' });
 const PORT = 8080;
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
+const projectRoutes = require('./routes/projectRoutes');
+app.use('/api/projects', projectRoutes);
+const taskRoutes = require('./routes/taskRoutes');
+app.use('/api/tasks', taskRoutes);
 
 app.listen(PORT, async () => {
     console.log(`Serverul a pornit pe portul ${PORT}`);
