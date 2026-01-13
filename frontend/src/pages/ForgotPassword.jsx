@@ -13,7 +13,7 @@ function ForgotPassword() {
         setMessage(''); setError(''); setLoading(true);
         
         try {
-            await axios.post('http://localhost:8080/api/auth/forgot-password', { email });
+            await axios.post('https://taskflow-api-qkmb.onrender.com/api/auth/forgot-password', { email });
             setMessage('Email trimis cu succes! Verifică inbox-ul (și folderul Spam).');
         } catch (err) {
             setError(err.response?.data?.error || 'Eroare la trimiterea emailului.');

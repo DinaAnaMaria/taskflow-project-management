@@ -29,15 +29,15 @@ function Dashboard() {
                 const headers = { Authorization: `Bearer ${token}` };
 
                 // 1. Proiecte
-                const projRes = await axios.get('http://localhost:8080/api/projects', { headers });
+                const projRes = await axios.get('https://taskflow-api-qkmb.onrender.com/api/projects', { headers });
                 setProjects(projRes.data);
 
                 // 2. Useri
-                const userRes = await axios.get('http://localhost:8080/api/users', { headers });
+                const userRes = await axios.get('https://taskflow-api-qkmb.onrender.com/api/users', { headers });
                 setUsers(userRes.data);
 
                 // 3. Sarcinile Mele (Istoric Complet)
-                const taskRes = await axios.get('http://localhost:8080/api/my-tasks', { headers });
+                const taskRes = await axios.get('https://taskflow-api-qkmb.onrender.com/api/my-tasks', { headers });
                 setMyTasks(taskRes.data);
 
             } catch (err) {
@@ -53,7 +53,7 @@ function Dashboard() {
         e.preventDefault();
         const token = localStorage.getItem('token');
         try {
-            await axios.post('http://localhost:8080/api/projects', newProject, { headers: { Authorization: `Bearer ${token}` }});
+            await axios.post('https://taskflow-api-qkmb.onrender.com/api/projects', newProject, { headers: { Authorization: `Bearer ${token}` }});
             window.location.reload();
         } catch (err) { alert('Eroare'); }
     };
@@ -62,7 +62,7 @@ function Dashboard() {
         if(!window.confirm("Ești sigur? Se vor șterge și toate sarcinile din acest proiect!")) return;
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`http://localhost:8080/api/projects/${id}`, { headers: { Authorization: `Bearer ${token}` }});
+            await axios.delete(`https://taskflow-api-qkmb.onrender.com/api/projects/${id}`, { headers: { Authorization: `Bearer ${token}` }});
             setProjects(projects.filter(p => p.id !== id));
         } catch (err) { alert('Eroare la ștergere'); }
     };
@@ -72,7 +72,7 @@ function Dashboard() {
         if(!window.confirm("Ești sigur că vrei să elimini acest utilizator?")) return;
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`http://localhost:8080/api/admin/users/${userId}`, { 
+            await axios.delete(`https://taskflow-api-qkmb.onrender.com/api/admin/users/${userId}`, { 
                 headers: { Authorization: `Bearer ${token}` } 
             });
             setUsers(users.filter(u => u.id !== userId));

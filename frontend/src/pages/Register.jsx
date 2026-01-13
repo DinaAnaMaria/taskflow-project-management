@@ -21,7 +21,7 @@ function Register() {
     e.preventDefault();
     try {
       // Acum serverul va răspunde corect la această adresă
-      await axios.post('http://localhost:8080/api/auth/register', formData);
+      await axios.post('https://taskflow-api-qkmb.onrender.com/api/auth/register', formData);
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.error || 'Eroare la înregistrare. Verifică datele.');

@@ -26,19 +26,19 @@ function ProjectDetails() {
             try {
                 // 1. Luăm lista de proiecte pentru a găsi numele proiectului curent
                 // (O soluție rapidă, ideal ar fi un endpoint separat /api/projects/:id)
-                const projRes = await axios.get('http://localhost:8080/api/projects', {
+                const projRes = await axios.get('https://taskflow-api-qkmb.onrender.com/api/projects', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const currentProj = projRes.data.find(p => p.id === parseInt(id));
                 if (currentProj) setProjectTitle(currentProj.name);
 
                 // 2. Luăm Task-urile
-                const tRes = await axios.get(`http://localhost:8080/api/tasks/project/${id}`, { headers: { Authorization: `Bearer ${token}` }});
+                const tRes = await axios.get(`https://taskflow-api-qkmb.onrender.com/api/tasks/project/${id}`, { headers: { Authorization: `Bearer ${token}` }});
                 setTasks(tRes.data);
                 
                 // 3. Luăm Userii (doar dacă nu ești executant, ca să poți aloca)
                 if (userPayload.role !== 'executant') {
-                    const uRes = await axios.get('http://localhost:8080/api/users', { headers: { Authorization: `Bearer ${token}` }});
+                    const uRes = await axios.get('https://taskflow-api-qkmb.onrender.com/api/users', { headers: { Authorization: `Bearer ${token}` }});
                     setUsers(uRes.data);
                 }
                 setLoading(false);
@@ -55,7 +55,7 @@ function ProjectDetails() {
         e.preventDefault();
         const token = localStorage.getItem('token');
         try {
-            await axios.post('http://localhost:8080/api/tasks', { ...newTask, projectId: id }, { headers: { Authorization: `Bearer ${token}` }});
+            await axios.post('https://taskflow-api-qkmb.onrender.com/api/tasks', { ...newTask, projectId: id }, { headers: { Authorization: `Bearer ${token}` }});
             window.location.reload();
         } catch (err) { alert('Eroare creare task'); }
     };
@@ -63,7 +63,7 @@ function ProjectDetails() {
     const updateStatus = async (taskId, endpoint, body = {}) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`http://localhost:8080/api/tasks/${taskId}/${endpoint}`, body, { headers: { Authorization: `Bearer ${token}` }});
+            await axios.put(`https://taskflow-api-qkmb.onrender.com/api/tasks/${taskId}/${endpoint}`, body, { headers: { Authorization: `Bearer ${token}` }});
             // Update local (optimist) ca să nu dăm reload paginii
             window.location.reload();
         } catch (err) { alert('Eroare actualizare'); }

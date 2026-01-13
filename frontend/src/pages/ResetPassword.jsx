@@ -13,7 +13,7 @@ function ResetPassword() {
         if (passwords.new !== passwords.confirm) return setError('Parolele nu coincid.');
         
         try {
-            await axios.post('http://localhost:8080/api/auth/reset-password', { 
+            await axios.post('https://taskflow-api-qkmb.onrender.com/api/auth/reset-password', { 
                 token, 
                 newPassword: passwords.new 
             });
