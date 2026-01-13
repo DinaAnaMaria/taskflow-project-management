@@ -1,11 +1,11 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../sequelize');
+const sequelize = require('../config/sequelize'); 
 
 const Project = sequelize.define('Project', {
     id: {
         type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
+        primaryKey: true
     },
     name: {
         type: DataTypes.STRING,
@@ -16,10 +16,12 @@ const Project = sequelize.define('Project', {
     },
     status: {
         type: DataTypes.STRING,
-        defaultValue: 'ACTIVE'
+        defaultValue: 'Active'
+    },
+    managerId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
     }
-}, {
-    tableName: 'Projects'
 });
 
 module.exports = Project;

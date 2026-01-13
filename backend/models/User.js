@@ -1,15 +1,15 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../sequelize');
+const sequelize = require('../config/sequelize'); 
 
 const User = sequelize.define('User', {
     id: {
         type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
+        primaryKey: true
     },
     firstName: {
         type: DataTypes.STRING,
-        allowNull: false // Nu are voie să fie gol
+        allowNull: false
     },
     lastName: {
         type: DataTypes.STRING,
@@ -18,21 +18,24 @@ const User = sequelize.define('User', {
     email: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true, // Nu pot exista doi useri cu același email
-        validate: {
-            isEmail: true // Verifică automat dacă e format de email
-        }
+        unique: true
     },
     password: {
         type: DataTypes.STRING,
         allowNull: false
     },
     role: {
-        type: DataTypes.ENUM('ADMIN', 'MANAGER', 'EXECUTANT'),
-        defaultValue: 'EXECUTANT'
+        type: DataTypes.ENUM('admin', 'manager', 'executant'),
+        defaultValue: 'executant',
+        allowNull: false
+    },
+    managerId: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    avatar: {
+        type: DataTypes.STRING
     }
-}, {
-    tableName: 'Users' // Numele tabelului în MySQL
 });
 
 module.exports = User;

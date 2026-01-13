@@ -1,31 +1,61 @@
 import React from 'react';
-import ProjectDetails from './pages/ProjectDetails';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 
-// Importăm paginile create
+// Importăm paginile
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import ProjectDetails from './pages/ProjectDetails';
+import ForgotPassword from './pages/ForgotPassword'; // <--- IMPORT NOU
+import ResetPassword from './pages/ResetPassword';   // <--- IMPORT NOU
+import './App.css';
+
+function MainLayout() {
+  const location = useLocation();
+  const hideNavbarPaths = ['/dashboard', '/project'];
+  const isAppPage = hideNavbarPaths.some(path => location.pathname.startsWith(path));
+
+  return (
+    <>
+      {!isAppPage && (
+        <nav className="navbar navbar-expand-lg bg-white border-bottom fixed-top px-4" style={{height: '70px', zIndex: 1000}}>
+          <div className="container-fluid">
+            <Link className="navbar-brand d-flex align-items-center gap-2 fw-bold text-dark" to="/">
+              <div className="d-flex align-items-center justify-content-center rounded bg-primary text-white" style={{width: 32, height: 32}}>
+                <i className="bi bi-lightning-fill" style={{fontSize: '1rem'}}></i>
+              </div>
+              <span style={{letterSpacing: '-0.5px'}}>TaskFlow</span>
+            </Link>
+            <div className="d-flex gap-3 align-items-center">
+              <Link to="/login" className="btn-secondary-modern">Logare</Link>
+              <Link to="/register" className="btn-primary-modern">Înregistrare</Link>
+            </div>
+          </div>
+        </nav>
+      )}
+
+      <div style={{ paddingTop: isAppPage ? '0' : '70px' }}>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/project/:id" element={<ProjectDetails />} />
+          
+          {/* --- RUTELE NOI --- */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          
+          <Route path="/" element={<Login />} />
+        </Routes>
+      </div>
+    </>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      {/* Bara de Meniu de sus */}
-      <nav style={{ padding: '15px', background: '#333', color: 'white', marginBottom: '20px' }}>
-        <Link to="/register" style={{ color: 'white', marginRight: '15px', textDecoration: 'none' }}>Înregistrare</Link>
-        <Link to="/login" style={{ color: 'white', marginRight: '15px', textDecoration: 'none' }}>Logare</Link>
-        <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>Dashboard</Link>
-      </nav>
-
-      {/* Aici se schimbă paginile în funcție de link */}
-      <Routes>
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/project/:id" element={<ProjectDetails />} />
-        {/* Dacă intră pe pagina principală, îl trimitem la Login */}
-        <Route path="/" element={<Login />} />
-      </Routes>
+      <MainLayout />
     </BrowserRouter>
   );
 }

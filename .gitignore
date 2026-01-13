@@ -1,4 +1,14 @@
-node_modules
-/backend/node_modules
-/frontend/node_modules
+# --- Modulele  ---
+node_modules/
+*/node_modules/
+
+# --- Secrete ---
 .env
+
+# --- React Build  ---
+/frontend/dist/
+/frontend/build/
+
+# --- Fișiere de sistem inutile (Mac/Windows) ---
+.DS_Store
+Thumbs.db
