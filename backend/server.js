@@ -38,7 +38,32 @@ const authenticate = (req, res, next) => {
     });
 };
 
-// ================= RUTE PROIECTE (Lipseau și sunt necesare) =================
+// ================= RUTA SETUP ADMIN (FIX) =================
+// Folosim GET pentru a putea fi accesată direct din browser
+app.get('/api/setup-admin', async (req, res) => {
+    try {
+        const hashedPassword = await bcrypt.hash("admin123", 10);
+        const [admin, created] = await User.findOrCreate({
+            where: { email: "admin@test.com" },
+            defaults: {
+                firstName: "Super",
+                lastName: "Admin",
+                password: hashedPassword,
+                role: "admin"
+            }
+        });
+
+        if (created) {
+            res.json({ message: "Admin creat cu succes! User: admin@test.com, Parola: admin123" });
+        } else {
+            res.json({ message: "Adminul exista deja in baza de date." });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ================= RUTE PROIECTE =================
 app.get('/api/projects', authenticate, async (req, res) => {
     try {
         const projects = await Project.findAll({
@@ -56,9 +81,8 @@ app.post('/api/projects', authenticate, async (req, res) => {
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// ================= RUTE TASK-URI (FLUX COMPLET) =================
+// ================= RUTE TASK-URI =================
 
-// 1. Managerul creează un task (Stare: OPEN)
 app.post('/api/tasks', authenticate, async (req, res) => {
     if(req.user.role === 'executant') return res.status(403).json({error: 'Executanții nu pot crea task-uri'});
     try {
@@ -67,20 +91,16 @@ app.post('/api/tasks', authenticate, async (req, res) => {
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// 2. Managerul alocă task-ul (Stare: PENDING)
 app.put('/api/tasks/:id/assign', authenticate, async (req, res) => {
     if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Fără drepturi'});
     try {
         const { assignedTo } = req.body;
-        
-        // Validare: Managerul poate aloca doar subordonaților lui
         if (req.user.role === 'manager') {
             const targetUser = await User.findByPk(assignedTo);
             if (!targetUser || targetUser.managerId !== req.user.id) {
-                return res.status(403).json({ error: 'Poți aloca task-uri doar subordonaților tăi directi!' });
+                return res.status(403).json({ error: 'Poți aloca task-uri doar subordonaților tăi!' });
             }
         }
-
         await Task.update(
             { assignedTo, status: 'PENDING' }, 
             { where: { id: req.params.id } }
@@ -89,52 +109,27 @@ app.put('/api/tasks/:id/assign', authenticate, async (req, res) => {
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// 3. Executantul marchează ca realizat (Stare: COMPLETED)
 app.put('/api/tasks/:id/complete', authenticate, async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
         if (!task || task.assignedTo !== req.user.id) return res.status(403).json({error: 'Nu ești alocat pe acest task'});
-        
         await task.update({ status: 'COMPLETED' });
         res.json({ message: 'Task realizat, stare: COMPLETED' });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// 4. Managerul închide task-ul (Stare: CLOSED)
 app.put('/api/tasks/:id/close', authenticate, async (req, res) => {
-    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Doar un manager poate închide task-ul'});
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Fără drepturi'});
     try {
         const task = await Task.findByPk(req.params.id);
         if (!task) return res.status(404).json({ error: 'Task negăsit' });
-        if(task.status !== 'COMPLETED') return res.status(400).json({error: 'Task-ul trebuie să fie COMPLETED pentru a fi închis'});
-        
+        if(task.status !== 'COMPLETED') return res.status(400).json({error: 'Task-ul trebuie să fie COMPLETED'});
         await task.update({ status: 'CLOSED' });
         res.json({ message: 'Task închis definitiv, stare: CLOSED' });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// ================= RUTE ISTORIC ȘI CONSULTARE =================
-
-app.get('/api/my-tasks', authenticate, async (req, res) => {
-    try {
-        const tasks = await Task.findAll({
-            where: { assignedTo: req.user.id },
-            include: [{ model: Project }]
-        });
-        res.json(tasks);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/my-history', authenticate, async (req, res) => {
-    try {
-        const tasks = await Task.findAll({
-            where: { assignedTo: req.user.id },
-            include: [{ model: Project }],
-            order: [['updatedAt', 'DESC']]
-        });
-        res.json(tasks);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// ================= RUTE CONSULTARE =================
 
 app.get('/api/users', authenticate, async (req, res) => {
     try {
@@ -145,8 +140,6 @@ app.get('/api/users', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ================= RUTE AUTH STANDARD =================
-
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -154,13 +147,11 @@ app.post('/api/auth/login', async (req, res) => {
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(400).json({ error: 'Date invalide.' });
         }
-
         const token = jwt.sign(
             { id: user.id, role: user.role, name: `${user.firstName} ${user.lastName}` }, 
             process.env.JWT_SECRET, 
             { expiresIn: '24h' }
         );
-        
         res.json({ 
             token, 
             user: { id: user.id, role: user.role, firstName: user.firstName, lastName: user.lastName } 
@@ -168,22 +159,20 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Adminul poate adăuga utilizatori
 app.post('/api/admin/create-user', authenticate, async (req, res) => { 
     if(req.user.role !== 'admin') return res.status(403).json({error: 'Doar adminul poate crea utilizatori'});
     try {
         const { firstName, lastName, email, password, role, managerId } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await User.create({
-            firstName, lastName, email, password: hashedPassword, role, managerId
-        });
+        const newUser = await User.create({ firstName, lastName, email, password: hashedPassword, role, managerId });
         res.json({ message: 'Utilizator creat cu succes', user: newUser });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 // START SERVER
 const PORT = process.env.PORT || 8080;
-sequelize.sync({ force: true }).then(() => {
-    console.log('✅ Server sincronizat cu Render și CleverCloud.');
+// Folosim alter: true pentru a nu sterge datele la fiecare restart
+sequelize.sync({ alter: true }).then(() => {
+    console.log('✅ Baza de date sincronizata.');
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 });
