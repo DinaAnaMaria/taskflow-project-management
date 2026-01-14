@@ -6,13 +6,16 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ProjectDetails from './pages/ProjectDetails';
-import ForgotPassword from './pages/ForgotPassword'; // <--- IMPORT NOU
-import ResetPassword from './pages/ResetPassword';   // <--- IMPORT NOU
+import ForgotPassword from './pages/ForgotPassword'; 
+import ResetPassword from './pages/ResetPassword';
+import AdminPanel from './pages/AdminPanel'; // <--- IMPORTUL PENTRU ADMIN
 import './App.css';
 
 function MainLayout() {
   const location = useLocation();
-  const hideNavbarPaths = ['/dashboard', '/project'];
+  
+  // Am adăugat și /admin aici pentru a ascunde navbar-ul de landing
+  const hideNavbarPaths = ['/dashboard', '/project', '/admin'];
   const isAppPage = hideNavbarPaths.some(path => location.pathname.startsWith(path));
 
   return (
@@ -41,7 +44,9 @@ function MainLayout() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/project/:id" element={<ProjectDetails />} />
           
-          {/* --- RUTELE NOI --- */}
+          {/* --- RUTA PENTRU ADMIN --- */}
+          <Route path="/admin" element={<AdminPanel />} />
+          
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
