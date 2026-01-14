@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom'; // <--- IMPORT CRITIC
+import { useNavigate, Link } from 'react-router-dom';
 
 function Login() {
   const navigate = useNavigate();
@@ -16,8 +16,16 @@ function Login() {
     e.preventDefault();
     try {
       const res = await axios.post('https://taskflow-api-qkmb.onrender.com/api/auth/login', formData);
+      
+      // 1. Salvezi token-ul pentru autorizarea cererilor API viitoare
       localStorage.setItem('token', res.data.token);
-      navigate('/dashboard');
+      
+      // 2. MODIFICAREA CRITICĂ: Salvezi obiectul 'user' primit de la server
+      // Acest pas este obligatoriu pentru ca Dashboard-ul să poată afișa numele și să știe rolul tău
+      localStorage.setItem('user', JSON.stringify(res.data.user)); 
+      
+      // 3. Redirecționezi utilizatorul către Dashboard
+      navigate('/dashboard'); 
     } catch (err) {
       setError(err.response?.data?.error || 'Date incorecte.');
     }
@@ -58,9 +66,7 @@ function Login() {
           <div className="mb-4">
             <div className="d-flex justify-content-between mb-1">
                 <label className="form-label small text-muted fw-bold" style={{fontSize: '0.75rem'}}>PAROLA</label>
-                
-                {/* --- AICI ERA PROBLEMA: ACUM E CORECT --- */}
-                <Link to="/forgot-password" className="small text-primary text-decoration-none fw-medium">
+                <Link to="/forgot-password" title="Recuperare parolă" className="small text-primary text-decoration-none fw-medium">
                     Ai uitat parola?
                 </Link>
             </div>
