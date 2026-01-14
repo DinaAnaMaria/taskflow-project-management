@@ -138,7 +138,22 @@ const historyTasks = allTasks.filter(t => {
                         </div>
                     )}
                 </header>
-
+{activeTab === 'overview' && (
+        <div style={s.statsRow}>
+            <div style={s.statCard}>
+                <span style={s.statLabel}>Total Active</span>
+                <span style={s.statNumber}>{activeTasks.length}</span>
+            </div>
+            <div style={s.statCard}>
+                <span style={s.statLabel}>In Work (Pending)</span>
+                <span style={s.statNumber}>{activeTasks.filter(t => t.status === 'PENDING').length}</span>
+            </div>
+            <div style={s.statCard}>
+                <span style={s.statLabel}>Total Completed</span>
+                <span style={s.statNumber}>{historyTasks.length}</span>
+            </div>
+        </div>
+    )}
                 {activeTab === 'history' && (
                     <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div style={{ position: 'relative', flexGrow: 1 }}>
@@ -357,6 +372,34 @@ const s = {
         cursor: 'pointer',
         fontSize: '13px',
         transition: '0.2s'
+    },
+    statsRow: { 
+        display: 'flex', 
+        gap: '24px', 
+        marginBottom: '32px' 
+    },
+    statCard: { 
+        flex: 1, 
+        backgroundColor: '#FFF', 
+        padding: '24px', 
+        borderRadius: '20px', 
+        border: '1px solid #E2E8F0', 
+        boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+    },
+    statLabel: { 
+        color: '#A3AED0', 
+        fontSize: '12px', 
+        fontWeight: '700', 
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px'
+    },
+    statNumber: { 
+        fontSize: '28px', 
+        fontWeight: '800', 
+        color: '#1B2559' 
     }
 };
 
