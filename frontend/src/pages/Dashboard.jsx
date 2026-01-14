@@ -1,252 +1,197 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
-function Dashboard() {
-    const navigate = useNavigate();
-    
-    // --- CONFIGURARE API ---
-    // Înlocuiește cu URL-ul tău de backend de pe Render
-    const API_URL ="https://taskflow-api-qkmb.onrender.com"; 
-
-    // State
-    const [projects, setProjects] = useState([]);
+const Dashboard = () => {
+    const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
-    const [myTasks, setMyTasks] = useState([]); 
-    const [currentUser, setCurrentUser] = useState({});
-    const [activeTab, setActiveTab] = useState('overview'); 
-    const [showForm, setShowForm] = useState(false);
-    const [newProject, setNewProject] = useState({ name: '', description: '' });
+    const [activeTab, setActiveTab] = useState('overview');
+    const [loading, setLoading] = useState(true);
 
-    // --- FETCH DATA ---
+    const user = JSON.parse(localStorage.getItem('user')) || {};
+    const token = localStorage.getItem('token');
+    const API_URL = "https://taskflow-api-qkmb.onrender.com"; 
+    const headers = { Authorization: `Bearer ${token}` };
+
     useEffect(() => {
-        const fetchData = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return navigate('/login');
-            
-            try {
-                // Decodare token pentru a lua rolul și numele utilizatorului
-                const payload = token.split('.')[1];
-                const userData = JSON.parse(atob(payload));
-                setCurrentUser(userData);
-
-                const headers = { Authorization: `Bearer ${token}` };
-
-                // 1. Proiecte
-                const projRes = await axios.get(`${API_URL}/projects`, { headers });
-                setProjects(projRes.data);
-
-                // 2. Useri (Doar dacă e Admin/Manager)
-                if (userData.role === 'admin' || userData.role === 'manager') {
-                    const userRes = await axios.get(`${API_URL}/users`, { headers });
-                    setUsers(userRes.data);
-                }
-
-                // 3. Sarcinile Mele
-                const taskRes = await axios.get(`${API_URL}/my-tasks`, { headers });
-                setMyTasks(taskRes.data);
-
-            } catch (err) {
-                console.error("Eroare la preluarea datelor:", err);
-                if(err.response?.status === 401) {
-                    localStorage.removeItem('token');
-                    navigate('/login');
-                }
-            }
-        };
         fetchData();
-    }, [navigate]);
+    }, [activeTab]);
 
-    // --- ACTIONS ---
-    const handleCreateProject = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
+    const fetchData = async () => {
+        setLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/projects`, newProject, { 
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setProjects([...projects, res.data]); // Update listă fără reload
-            setNewProject({ name: '', description: '' });
-            setShowForm(false);
-        } catch (err) { alert('Eroare la creare proiect'); }
+            // Rutele din server.js-ul tău
+            const resTasks = await axios.get(`${API_URL}/projects`, { headers });
+            const allTasks = resTasks.data.flatMap(p => p.Tasks || []);
+            setTasks(allTasks);
+
+            if (user.role !== 'executant') {
+                const resUsers = await axios.get(`${API_URL}/users`, { headers });
+                setUsers(resUsers.data);
+            }
+        } catch (err) {
+            console.error("Eroare API:", err);
+        }
+        setLoading(false);
     };
 
-    const handleDeleteProject = async (id) => {
-        if(!window.confirm("Ești sigur? Se vor șterge și toate sarcinile din acest proiect!")) return;
-        const token = localStorage.getItem('token');
+    const handleAction = async (taskId, action, body = {}) => {
         try {
-            await axios.delete(`${API_URL}/projects/${id}`, { 
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setProjects(projects.filter(p => p.id !== id));
-        } catch (err) { alert('Eroare la ștergere proiect'); }
+            await axios.put(`${API_URL}/tasks/${taskId}/${action}`, body, { headers });
+            fetchData();
+        } catch (err) {
+            alert("Eroare la procesarea task-ului!");
+        }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if(!window.confirm("Ești sigur că vrei să elimini acest utilizator?")) return;
-        const token = localStorage.getItem('token');
-        try {
-            await axios.delete(`${API_URL}/admin/users/${userId}`, { 
-                headers: { Authorization: `Bearer ${token}` } 
-            });
-            setUsers(users.filter(u => u.id !== userId));
-        } catch (err) { alert('Eroare: Nu ai drepturi sau serverul a refuzat cererea.'); }
+    // Funcții de ajutor pentru design
+    const getStatusInfo = (status) => {
+        const map = {
+            'OPEN': { color: '#3b82f6', bg: '#eff6ff', label: 'Deschis' },
+            'PENDING': { color: '#f59e0b', bg: '#fffbeb', label: 'În Lucru' },
+            'COMPLETED': { color: '#10b981', bg: '#ecfdf5', label: 'Finalizat' },
+            'CLOSED': { color: '#6b7280', bg: '#f3f4f6', label: 'Închis' }
+        };
+        return map[status] || map['OPEN'];
     };
-
-    const handleLogout = () => {
-        localStorage.clear();
-        navigate('/login');
-    };
-
-    // --- RENDER VIEWS ---
-
-    const renderOverview = () => (
-        <div className="row g-4 animate__animated animate__fadeIn p-4">
-            <div className="col-md-4">
-                <div className="modern-card p-4 d-flex align-items-center gap-3 border-primary border-start border-4">
-                    <div className="bg-primary-subtle text-primary rounded p-3">📅</div>
-                    <div>
-                        <h3 className="fw-bold m-0">{myTasks.filter(t => t.status !== 'CLOSED').length}</h3>
-                        <p className="text-muted m-0 small fw-bold">SARCINI ACTIVE</p>
-                    </div>
-                </div>
-            </div>
-            <div className="col-md-4">
-                <div className="modern-card p-4 d-flex align-items-center gap-3 border-info border-start border-4">
-                    <div className="bg-light text-dark rounded p-3 border">📁</div>
-                    <div>
-                        <h3 className="fw-bold m-0">{projects.length}</h3>
-                        <p className="text-muted m-0 small fw-bold">PROIECTE</p>
-                    </div>
-                </div>
-            </div>
-            <div className="col-md-4">
-                <div className="modern-card p-4 d-flex align-items-center gap-3 border-success border-start border-4">
-                    <div className="bg-light text-dark rounded p-3 border">👥</div>
-                    <div>
-                        <h3 className="fw-bold m-0">{users.length}</h3>
-                        <p className="text-muted m-0 small fw-bold">ECHIPĂ</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderMyTasks = () => (
-        <div className="p-4 animate__animated animate__fadeIn">
-            <h4 className="fw-bold mb-4">Sarcini Alocate Mie</h4>
-            <div className="row g-3">
-                {myTasks.map(task => (
-                    <div key={task.id} className="col-md-6">
-                        <div className={`modern-card p-3 border-start border-4 ${task.status === 'COMPLETED' ? 'border-success' : 'border-warning'}`}>
-                            <div className="d-flex justify-content-between">
-                                <h6 className="fw-bold">{task.title}</h6>
-                                <span className="badge bg-light text-dark border">{task.status}</span>
-                            </div>
-                            <p className="small text-muted">{task.description}</p>
-                        </div>
-                    </div>
-                ))}
-                {myTasks.length === 0 && <p className="text-muted">Nu ai sarcini alocate încă.</p>}
-            </div>
-        </div>
-    );
-
-    const renderProjects = () => (
-        <div className="p-4 animate__animated animate__fadeIn">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h4 className="fw-bold m-0">Proiecte Active</h4>
-                {(currentUser.role === 'admin' || currentUser.role === 'manager') && (
-                    <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-                        {showForm ? 'Anulează' : '+ Proiect Nou'}
-                    </button>
-                )}
-            </div>
-
-            {showForm && (
-                <div className="modern-card mb-4 p-4 bg-light border-0">
-                    <form onSubmit={handleCreateProject} className="row g-3">
-                        <div className="col-md-5">
-                            <input type="text" className="form-control" placeholder="Nume Proiect" 
-                                value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} required />
-                        </div>
-                        <div className="col-md-5">
-                            <input type="text" className="form-control" placeholder="Descriere" 
-                                value={newProject.description} onChange={e => setNewProject({...newProject, description: e.target.value})} />
-                        </div>
-                        <div className="col-md-2">
-                            <button className="btn btn-success w-100">Creează</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="row g-4">
-                {projects.map(proj => (
-                    <div key={proj.id} className="col-md-6">
-                        <div className="modern-card p-3 shadow-sm">
-                            <div className="d-flex justify-content-between">
-                                <h6 className="fw-bold">{proj.name}</h6>
-                                {(currentUser.role === 'admin' || currentUser.role === 'manager') && (
-                                    <button onClick={() => handleDeleteProject(proj.id)} className="btn btn-sm text-danger">Șterge</button>
-                                )}
-                            </div>
-                            <p className="text-muted small">{proj.description}</p>
-                            <button onClick={() => navigate(`/project/${proj.id}`)} className="btn btn-sm btn-outline-primary">Vezi Detalii</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderTeam = () => (
-        <div className="p-4 animate__animated animate__fadeIn">
-            <h4 className="fw-bold mb-4">Membrii Echipei</h4>
-            <div className="row g-3">
-                {users.map(u => (
-                    <div key={u.id} className="col-md-4">
-                        <div className="modern-card p-3 d-flex justify-content-between align-items-center shadow-sm">
-                            <div>
-                                <h6 className="fw-bold m-0">{u.firstName} {u.lastName}</h6>
-                                <small className="badge bg-light text-secondary border">{u.role}</small>
-                            </div>
-                            {currentUser.role === 'admin' && u.id !== currentUser.id && (
-                                <button onClick={() => handleDeleteUser(u.id)} className="btn btn-sm text-danger">Elimină</button>
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-            {/* SIDEBAR */}
-            <div style={{ width: '260px', background: 'white', borderRight: '1px solid #eee', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                <h3 className="fw-bold text-primary mb-5">TaskFlow</h3>
-                <nav className="nav flex-column gap-2 flex-grow-1">
-                    <button className={`btn text-start ${activeTab === 'overview' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('overview')}>📊 Overview</button>
-                    <button className={`btn text-start ${activeTab === 'mytasks' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('mytasks')}>✅ My Tasks</button>
-                    <button className={`btn text-start ${activeTab === 'projects' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('projects')}>📂 Projects</button>
-                    <button className={`btn text-start ${activeTab === 'team' ? 'btn-primary' : ''}`} onClick={() => setActiveTab('team')}>👥 Team</button>
-                </nav>
-                <div className="border-top pt-3">
-                    <p className="small mb-1"><strong>{currentUser.name}</strong></p>
-                    <button onClick={handleLogout} className="btn btn-sm btn-outline-danger w-100">Deconectare</button>
+        <div style={styles.appContainer}>
+            {/* SIDEBAR PROFESIONAL */}
+            <aside style={styles.sidebar}>
+                <div style={styles.logoArea}>
+                    <div style={styles.logoIcon}>TF</div>
+                    <span style={styles.logoText}>TaskFlow<span style={{color:'#3b82f6'}}>Pro</span></span>
                 </div>
-            </div>
+                
+                <nav style={styles.sideNav}>
+                    <button style={activeTab === 'overview' ? styles.navActive : styles.navBtn} onClick={() => setActiveTab('overview')}>
+                        📊 Ansamblu
+                    </button>
+                    <button style={activeTab === 'mytasks' ? styles.navActive : styles.navBtn} onClick={() => setActiveTab('mytasks')}>
+                        ✅ Sarcinile Mele
+                    </button>
+                    {user.role === 'admin' && (
+                        <button style={styles.navBtn}>⚙️ Administrare</button>
+                    )}
+                </nav>
 
-            {/* MAIN CONTENT */}
-            <div style={{ flexGrow: 1 }}>
-                {activeTab === 'overview' && renderOverview()}
-                {activeTab === 'mytasks' && renderMyTasks()}
-                {activeTab === 'projects' && renderProjects()}
-                {activeTab === 'team' && renderTeam()}
-            </div>
+                <div style={styles.userSection}>
+                    <div style={styles.userCard}>
+                        <div style={styles.userInitials}>{user.name?.charAt(0)}</div>
+                        <div style={{overflow:'hidden'}}>
+                            <div style={styles.userName}>{user.name}</div>
+                            <div style={styles.userRoleText}>{user.role?.toUpperCase()}</div>
+                        </div>
+                    </div>
+                    <button onClick={() => {localStorage.clear(); window.location.href='/login'}} style={styles.logoutBtn}>
+                        Deconectare
+                    </button>
+                </div>
+            </aside>
+
+            {/* CONTINUT PRINCIPAL */}
+            <main style={styles.mainContent}>
+                <header style={styles.topHeader}>
+                    <div>
+                        <h1 style={styles.welcomeText}>Salutare, {user.name}!</h1>
+                        <p style={styles.subtext}>Iată situația proiectelor tale astăzi.</p>
+                    </div>
+                </header>
+
+                {/* KPI CARDS (Statistici) */}
+                <div style={styles.statsRow}>
+                    <div style={styles.statCard}>
+                        <span style={styles.statLabel}>Task-uri Active</span>
+                        <div style={styles.statValue}>{tasks.filter(t => t.status !== 'CLOSED').length}</div>
+                    </div>
+                    <div style={styles.statCard}>
+                        <span style={styles.statLabel}>Echipa Ta</span>
+                        <div style={styles.statValue}>{users.length}</div>
+                    </div>
+                    <div style={styles.statCard}>
+                        <span style={styles.statLabel}>Rată de succes</span>
+                        <div style={styles.statValue}>88%</div>
+                    </div>
+                </div>
+
+                {/* TASK FEED */}
+                <div style={styles.feedSection}>
+                    <h3 style={styles.sectionTitle}>Fluxul de Activitate</h3>
+                    <div style={styles.taskTable}>
+                        {tasks.map(task => {
+                            const status = getStatusInfo(task.status);
+                            return (
+                                <div key={task.id} style={styles.taskRow}>
+                                    <div style={{flex: 2}}>
+                                        <div style={styles.taskTitleText}>{task.title}</div>
+                                        <div style={styles.taskDescriptionText}>{task.description}</div>
+                                    </div>
+                                    <div style={{flex: 1}}>
+                                        <span style={{...styles.statusTag, color: status.color, backgroundColor: status.bg}}>
+                                            {status.label}
+                                        </span>
+                                    </div>
+                                    <div style={{flex: 1, textAlign: 'right'}}>
+                                        {/* BUTOANE CONDIȚIONATE */}
+                                        {user.role === 'manager' && task.status === 'OPEN' && (
+                                            <select style={styles.actionSelect} onChange={(e) => handleAction(task.id, 'assign', { assignedTo: e.target.value })}>
+                                                <option value="">Alocă...</option>
+                                                {users.filter(u => u.role === 'executant' && u.managerId === user.id).map(u => (
+                                                    <option key={u.id} value={u.id}>{u.firstName}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        {user.role === 'executant' && task.status === 'PENDING' && (
+                                            <button style={styles.primaryAction} onClick={() => handleAction(task.id, 'complete')}>Finalizează</button>
+                                        )}
+                                        {user.role === 'manager' && task.status === 'COMPLETED' && (
+                                            <button style={styles.secondaryAction} onClick={() => handleAction(task.id, 'close')}>Închide</button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </main>
         </div>
     );
-}
+};
+
+// --- DESIGN SISTEM (STILURI) ---
+const styles = {
+    appContainer: { display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', color: '#1e293b', fontFamily: "'Inter', sans-serif" },
+    sidebar: { width: '280px', backgroundColor: '#ffffff', borderRight: '1px solid #e2e8f0', padding: '32px 24px', display: 'flex', flexDirection: 'column' },
+    logoArea: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '48px' },
+    logoIcon: { backgroundColor: '#3b82f6', color: '#fff', width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px' },
+    logoText: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px' },
+    sideNav: { flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
+    navBtn: { padding: '12px 16px', border: 'none', background: 'none', borderRadius: '12px', textAlign: 'left', cursor: 'pointer', color: '#64748b', fontWeight: '500', transition: '0.2s' },
+    navActive: { padding: '12px 16px', border: 'none', backgroundColor: '#eff6ff', color: '#3b82f6', borderRadius: '12px', textAlign: 'left', fontWeight: '600' },
+    userSection: { marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #f1f5f9' },
+    userCard: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
+    userInitials: { width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#3b82f6' },
+    userName: { fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap' },
+    userRoleText: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' },
+    logoutBtn: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #fee2e2', backgroundColor: '#fff', color: '#ef4444', fontWeight: '600', cursor: 'pointer', fontSize: '13px' },
+    mainContent: { flexGrow: 1, padding: '48px', overflowY: 'auto' },
+    topHeader: { marginBottom: '32px' },
+    welcomeText: { fontSize: '28px', fontWeight: '800', marginBottom: '4px' },
+    subtext: { color: '#64748b', fontSize: '16px' },
+    statsRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '48px' },
+    statCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' },
+    statLabel: { fontSize: '14px', fontWeight: '600', color: '#94a3b8' },
+    statValue: { fontSize: '32px', fontWeight: '800', color: '#1e293b', marginTop: '4px' },
+    feedSection: { backgroundColor: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' },
+    sectionTitle: { fontSize: '20px', fontWeight: '700', marginBottom: '24px' },
+    taskTable: { display: 'flex', flexDirection: 'column' },
+    taskRow: { display: 'flex', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid #f8fafc' },
+    taskTitleText: { fontWeight: '600', fontSize: '15px' },
+    taskDescriptionText: { fontSize: '13px', color: '#94a3b8', marginTop: '2px' },
+    statusTag: { padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: '700' },
+    actionSelect: { padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' },
+    primaryAction: { padding: '8px 16px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
+    secondaryAction: { padding: '8px 16px', backgroundColor: '#1e293b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }
+};
 
 export default Dashboard;
