@@ -75,6 +75,19 @@ const Dashboard = () => {
         }
     };
 
+    // --- ADAUGĂ ACEASTĂ FUNCȚIE LÂNGĂ handleDeleteTask ---
+const handleDeleteProject = async (projectId) => {
+    if (window.confirm("⚠️ ATENȚIE: Ștergerea proiectului va elimina definitiv și toate sarcinile asociate acestuia! Dorești să continui?")) {
+        try {
+            await axios.delete(`${API_URL}/projects/${projectId}`, { headers });
+            fetchData(); // Reîmprospătează lista
+        } catch (err) {
+            alert("Eroare la ștergere: " + (err.response?.data?.error || "Eroare server"));
+        }
+    }
+};
+
+
     const allTasks = projects.flatMap(p => p.Tasks || []);
     const historyTasks = allTasks.filter(t => t.status === 'CLOSED');
     const activeTasks = allTasks.filter(t => t.status !== 'CLOSED');
@@ -111,6 +124,26 @@ const Dashboard = () => {
                         </div>
                     )}
                 </header>
+
+                {activeTab === 'overview' && user.role === 'manager' && (
+    <div style={s.projectGrid}>
+        {projects.map(p => (
+            <div key={p.id} style={s.projectCard}>
+                <div style={s.projectInfo}>
+                    <h4 style={s.projectCardTitle}>{p.name}</h4>
+                    <p style={s.projectCardDesc}>{p.Tasks?.length || 0} Sarcini active</p>
+                </div>
+                <button 
+                    onClick={() => handleDeleteProject(p.id)} 
+                    style={s.btnDeleteIcon}
+                    title="Șterge Proiect"
+                >
+                    🗑️
+                </button>
+            </div>
+        ))}
+    </div>
+)}
 
                 {/* FORMULARELE RAMAN IN STIL GLASSMORPHISM */}
                 {(showProjectForm || showTaskForm) && (
@@ -238,7 +271,37 @@ const s = {
     actionSelect: { padding: '8px 12px', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '13px', fontWeight: '600', color: '#1B2559' },
     btnDone: { padding: '8px 16px', backgroundColor: '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' },
     btnClose: { padding: '8px 16px', backgroundColor: '#1B2559', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' },
-    btnDelete: { background: '#FFF1F2', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer', transition: '0.2s', filter: 'grayscale(1)' }
+    btnDelete: { background: '#FFF1F2', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer', transition: '0.2s', filter: 'grayscale(1)' },
+    projectGrid: { 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+        gap: '20px', 
+        marginBottom: '40px' 
+    },
+    projectCard: { 
+        backgroundColor: '#FFF', 
+        padding: '20px', 
+        borderRadius: '20px', 
+        border: '1px solid #E2E8F0', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        transition: '0.3s'
+    },
+    projectInfo: { display: 'flex', flexDirection: 'column', gap: '4px' },
+    projectCardTitle: { margin: 0, fontSize: '16px', fontWeight: '700', color: '#1B2559' },
+    projectCardDesc: { margin: 0, fontSize: '13px', color: '#A3AED0', fontWeight: '500' },
+    btnDeleteIcon: { 
+        background: '#FFF1F2', 
+        border: 'none', 
+        padding: '10px', 
+        borderRadius: '12px', 
+        cursor: 'pointer',
+        fontSize: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    }
 };
 
 export default Dashboard;

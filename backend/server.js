@@ -360,6 +360,18 @@ app.delete('/api/tasks/:id', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/projects/:id', authenticate, async (req, res) => {
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Doar managerii pot șterge proiecte.' });
+    }
+    try {
+        await Project.destroy({ where: { id: req.params.id } });
+        res.json({ message: 'Proiectul și sarcinile asociate au fost șterse.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // START SERVER
 
 const PORT = process.env.PORT || 8080;
