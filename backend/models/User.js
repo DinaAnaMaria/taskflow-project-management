@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/sequelize'); 
+const sequelize = require('../config/sequelize');
 
 const User = sequelize.define('User', {
     id: {
@@ -20,7 +20,7 @@ const User = sequelize.define('User', {
         allowNull: false,
         unique: true,
         validate: {
-            isEmail: true // Validare extra pentru siguranță
+            isEmail: true
         }
     },
     password: {
@@ -36,20 +36,28 @@ const User = sequelize.define('User', {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-            model: 'Users', // Se referă la aceeași tabelă
+            model: 'Users',
             key: 'id'
         }
+    },
+    resetToken: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    resetTokenExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
     },
     avatar: {
         type: DataTypes.STRING,
         allowNull: true
     }
 }, {
-    timestamps: true // Adaugă automat createdAt și updatedAt, util pentru istoric
+    timestamps: true 
 });
 
-// Definirea relației de subordonare (Manager has many Executanți)
-//User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
-//User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
+// Dacă vrei să activezi relațiile, folosește-le așa (asigură-te că sunt definite după model):
+// User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
+// User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
 
 module.exports = User;
