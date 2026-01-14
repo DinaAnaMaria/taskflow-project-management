@@ -21,14 +21,24 @@ const AdminPanel = () => {
     };
 
     const handleCreateUser = async (e) => {
-        e.preventDefault();
-        try {
-            await axios.post(`${API_URL}/admin/create-user`, formData, { headers });
-            alert("Utilizator creat cu succes!");
-            setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'executant', managerId: '' });
-            fetchUsers();
-        } catch (err) { alert("Eroare: " + err.response?.data?.error); }
+    e.preventDefault();
+    
+    // Pregătim datele pentru trimitere
+    const payload = {
+        ...formData,
+        // Dacă managerId este un text gol, îl convertim în null, altfel baza de date dă eroare
+        managerId: formData.managerId === "" ? null : formData.managerId
     };
+
+    try {
+        await axios.post(`${API_URL}/admin/create-user`, payload, { headers });
+        alert("Utilizator creat cu succes!");
+        setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'executant', managerId: '' });
+        fetchUsers();
+    } catch (err) { 
+        alert("Eroare: " + (err.response?.data?.error || err.message)); 
+    }
+};
 
     return (
         <div style={s.adminContainer}>
