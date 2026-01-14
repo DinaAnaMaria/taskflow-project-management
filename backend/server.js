@@ -352,7 +352,13 @@ app.post('/api/admin/create-user', authenticate, async (req, res) => {
 
 });
 
-
+app.delete('/api/tasks/:id', authenticate, async (req, res) => {
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Fără drepturi'});
+    try {
+        await Task.destroy({ where: { id: req.params.id } });
+        res.json({ message: 'Task șters cu succes' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // START SERVER
 
