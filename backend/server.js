@@ -12,22 +12,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= RELAȚII BAZĂ DE DATE (FIXED) =================
-// Șterge orice alte asocieri ai între User, Project și Task și pune-le DOAR pe acestea:
-
+// ================= RELAȚII BAZĂ DE DATE (VERSIUNEA FINALĂ FĂRĂ ERORI) =================
 // 1. Relația ierarhică (Manager -> Subordonați)
 User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
 User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
 
-// 2. Relația Manager -> Proiecte
+// 2. Relația Proiecte (Manager -> Proiecte)
 User.hasMany(Project, { foreignKey: 'managerId' });
 Project.belongsTo(User, { foreignKey: 'managerId' });
 
-// 3. Relația Proiect -> Task-uri
+// 3. Relația Task-uri (Proiect -> Task-uri)
 Project.hasMany(Task, { foreignKey: 'projectId', onDelete: 'CASCADE' });
 Task.belongsTo(Project, { foreignKey: 'projectId' });
 
-// 4. Relația Task -> Executant (Executor)
+// 4. Relația Execuție (Task -> Executant)
 User.hasMany(Task, { foreignKey: 'assignedTo', as: 'assignedTasks' }); 
 Task.belongsTo(User, { foreignKey: 'assignedTo', as: 'executor' });
 
