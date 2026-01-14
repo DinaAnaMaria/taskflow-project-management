@@ -2,21 +2,21 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const Dashboard = () => {
-    const [tasks, setTasks] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [users, setUsers] = useState([]);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState('overview'); // overview | mytasks
     const [loading, setLoading] = useState(true);
 
-    // Citim datele din LocalStorage salvate la Login
+    // Citim datele din LocalStorage
     const user = JSON.parse(localStorage.getItem('user')) || {};
     const token = localStorage.getItem('token');
     
-    // Adresa ta de Render
+    // URL-ul tău de Render
     const API_URL = "https://taskflow-api-qkmb.onrender.com/api"; 
     const headers = { Authorization: `Bearer ${token}` };
 
-    // Logică pentru a evita "undefined" la nume
-    const userName = user.name || user.firstName || user.lastName || "Utilizator";
+    // Numele afișat (fără undefined)
+    const displayName = user.firstName || user.name || "Utilizator";
 
     useEffect(() => {
         if (!token) window.location.href = '/login';
@@ -26,127 +26,123 @@ const Dashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Preluăm proiectele care conțin task-urile
-            const resTasks = await axios.get(`${API_URL}/projects`, { headers });
-            const allTasks = resTasks.data.flatMap(p => p.Tasks || []);
-            setTasks(allTasks);
+            // 1. Preluăm proiectele (care conțin task-urile)
+            const resProj = await axios.get(`${API_URL}/projects`, { headers });
+            setProjects(resProj.data);
 
-            // Preluăm echipa pentru Manager/Admin
+            // 2. Preluăm echipa (doar dacă nu ești simplu executant)
             if (user.role !== 'executant') {
                 const resUsers = await axios.get(`${API_URL}/users`, { headers });
                 setUsers(resUsers.data);
             }
         } catch (err) {
-            console.error("Eroare API Render:", err);
+            console.error("Eroare la încărcarea datelor:", err);
         }
         setLoading(false);
     };
 
+    // Funcție pentru acțiunile pe task (Alocare, Finalizare, Închidere)
     const handleAction = async (taskId, action, body = {}) => {
         try {
             await axios.put(`${API_URL}/tasks/${taskId}/${action}`, body, { headers });
-            fetchData(); // Reîncărcăm datele după succes
+            fetchData(); // Refresh listă
         } catch (err) {
-            alert("Eroare la procesarea cererii.");
+            alert(err.response?.data?.error || "Eroare la procesarea task-ului");
         }
     };
 
-    const getStatusInfo = (status) => {
-        const map = {
+    const getStatusStyle = (status) => {
+        const colors = {
             'OPEN': { color: '#3b82f6', bg: '#eff6ff', label: 'Deschis' },
             'PENDING': { color: '#f59e0b', bg: '#fffbeb', label: 'În Lucru' },
             'COMPLETED': { color: '#10b981', bg: '#ecfdf5', label: 'Finalizat' },
             'CLOSED': { color: '#64748b', bg: '#f1f5f9', label: 'Închis' }
         };
-        return map[status] || map['OPEN'];
+        return colors[status] || colors['OPEN'];
     };
 
+    // Extragem toate task-urile din proiecte pentru a le afișa în feed
+    const allTasks = projects.flatMap(p => p.Tasks || []);
+
     return (
-        <div style={styles.appContainer}>
+        <div style={s.container}>
             {/* SIDEBAR */}
-            <aside style={styles.sidebar}>
-                <div style={styles.logoArea}>
-                    <div style={styles.logoIcon}>TF</div>
-                    <span style={styles.logoText}>TaskFlow<span style={{color:'#3b82f6'}}>Pro</span></span>
+            <aside style={s.sidebar}>
+                <div style={s.logoArea}>
+                    <div style={s.logoIcon}>TF</div>
+                    <span style={s.logoText}>TaskFlow<span style={{color:'#3b82f6'}}>Pro</span></span>
                 </div>
                 
-                <nav style={styles.sideNav}>
+                <nav style={s.nav}>
                     <button 
-                        style={activeTab === 'overview' ? styles.navActive : styles.navBtn} 
+                        style={activeTab === 'overview' ? s.navActive : s.navBtn} 
                         onClick={() => setActiveTab('overview')}
                     >
                         📊 Privire de ansamblu
                     </button>
                     <button 
-                        style={activeTab === 'mytasks' ? styles.navActive : styles.navBtn} 
+                        style={activeTab === 'mytasks' ? s.navActive : s.navBtn} 
                         onClick={() => setActiveTab('mytasks')}
                     >
                         ✅ Sarcinile Mele
                     </button>
                 </nav>
 
-                <div style={styles.userSection}>
-                    <div style={styles.userCard}>
-                        <div style={styles.userInitials}>{userName.charAt(0)}</div>
-                        <div style={{overflow:'hidden'}}>
-                            <div style={styles.userName}>{userName}</div>
-                            <div style={styles.userRoleText}>{user.role?.toUpperCase()}</div>
-                        </div>
+                <div style={s.userBox}>
+                    <div style={s.avatar}>{displayName.charAt(0)}</div>
+                    <div style={{overflow:'hidden'}}>
+                        <div style={s.uName}>{displayName}</div>
+                        <div style={s.uRole}>{user.role?.toUpperCase()}</div>
                     </div>
-                    <button onClick={() => {localStorage.clear(); window.location.href='/login'}} style={styles.logoutBtn}>
-                        Deconectare
-                    </button>
+                    <button onClick={() => {localStorage.clear(); window.location.href='/login'}} style={s.logout}>✕</button>
                 </div>
             </aside>
 
             {/* MAIN CONTENT */}
-            <main style={styles.mainContent}>
-                <header style={styles.topHeader}>
-                    <h1 style={styles.welcomeText}>
-                        {activeTab === 'overview' ? `Salutare, ${userName}!` : "Sarcinile Mele"}
+            <main style={s.main}>
+                <header style={s.header}>
+                    <h1 style={s.title}>
+                        {activeTab === 'overview' ? `Salutare, ${displayName}!` : "Lista Mea de Lucru"}
                     </h1>
-                    <p style={styles.subtext}>
-                        {activeTab === 'overview' ? "Situația proiectelor tale pe Render." : "Doar task-urile alocate ție."}
+                    <p style={s.subtitle}>
+                        {activeTab === 'overview' ? "Toate activitățile din sistem." : "Sarcini alocate ție personal."}
                     </p>
                 </header>
 
-                {/* STATS */}
-                <div style={styles.statsRow}>
-                    <div style={styles.statCard}>
-                        <span style={styles.statLabel}>Task-uri Active</span>
-                        <div style={styles.statValue}>
-                            {tasks.filter(t => t.status !== 'CLOSED' && (activeTab === 'overview' || t.assignedTo === user.id)).length}
-                        </div>
+                <div style={s.statsRow}>
+                    <div style={s.statCard}>
+                        <span style={s.statLabel}>Task-uri Active</span>
+                        <div style={s.statValue}>{allTasks.filter(t => t.status !== 'CLOSED').length}</div>
                     </div>
-                    <div style={styles.statCard}>
-                        <span style={styles.statLabel}>Echipă</span>
-                        <div style={styles.statValue}>{users.length}</div>
+                    <div style={s.statCard}>
+                        <span style={s.statLabel}>Echipa Ta</span>
+                        <div style={s.statValue}>{users.length}</div>
                     </div>
                 </div>
 
-                {/* TASK FEED */}
-                <div style={styles.feedSection}>
-                    <div style={styles.taskTable}>
-                        {tasks
+                <div style={s.card}>
+                    <h3 style={{marginBottom:'20px'}}>Flux Activitate</h3>
+                    <div style={s.list}>
+                        {allTasks
                             .filter(t => activeTab === 'mytasks' ? t.assignedTo === user.id : true)
                             .map(task => {
-                                const status = getStatusInfo(task.status);
+                                const style = getStatusStyle(task.status);
                                 return (
-                                    <div key={task.id} style={styles.taskRow}>
+                                    <div key={task.id} style={s.row}>
                                         <div style={{flex: 2}}>
-                                            <div style={styles.taskTitleText}>{task.title}</div>
-                                            <div style={styles.taskDescriptionText}>{task.description}</div>
+                                            <div style={s.taskTitle}>{task.title}</div>
+                                            <div style={s.taskDesc}>{task.description}</div>
                                         </div>
                                         <div style={{flex: 1}}>
-                                            <span style={{...styles.statusTag, color: status.color, backgroundColor: status.bg}}>
-                                                {status.label}
+                                            <span style={{...s.badge, color: style.color, backgroundColor: style.bg}}>
+                                                {style.label}
                                             </span>
                                         </div>
                                         <div style={{flex: 1, textAlign: 'right'}}>
-                                            {/* MANAGER: Alocare */}
-                                            {user.role === 'manager' && task.status === 'OPEN' && activeTab === 'overview' && (
+                                            {/* MANAGER: ALOCARE */}
+                                            {user.role === 'manager' && task.status === 'OPEN' && (
                                                 <select 
-                                                    style={styles.actionSelect} 
+                                                    style={s.select} 
                                                     onChange={(e) => handleAction(task.id, 'assign', { assignedTo: e.target.value })}
                                                 >
                                                     <option value="">Alocă...</option>
@@ -156,16 +152,16 @@ const Dashboard = () => {
                                                 </select>
                                             )}
                                             
-                                            {/* EXECUTANT: Finalizare */}
+                                            {/* EXECUTANT: FINALIZARE */}
                                             {task.status === 'PENDING' && task.assignedTo === user.id && (
-                                                <button style={styles.primaryAction} onClick={() => handleAction(task.id, 'complete')}>
-                                                    Finalizează
+                                                <button style={s.btnDone} onClick={() => handleAction(task.id, 'complete')}>
+                                                    Realizat
                                                 </button>
                                             )}
 
-                                            {/* MANAGER: Închidere */}
+                                            {/* MANAGER: INCHIDERE */}
                                             {user.role === 'manager' && task.status === 'COMPLETED' && (
-                                                <button style={styles.secondaryAction} onClick={() => handleAction(task.id, 'close')}>
+                                                <button style={s.btnClose} onClick={() => handleAction(task.id, 'close')}>
                                                     Închide
                                                 </button>
                                             )}
@@ -181,39 +177,37 @@ const Dashboard = () => {
     );
 };
 
-// --- STILURI MODERNE ---
-const styles = {
-    appContainer: { display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', color: '#1e293b', fontFamily: "'Inter', sans-serif" },
-    sidebar: { width: '280px', backgroundColor: '#fff', borderRight: '1px solid #e2e8f0', padding: '32px 24px', display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh' },
-    logoArea: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '48px' },
-    logoIcon: { backgroundColor: '#3b82f6', color: '#fff', width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
-    logoText: { fontSize: '22px', fontWeight: '700' },
-    sideNav: { flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
-    navBtn: { padding: '12px 16px', border: 'none', background: 'none', borderRadius: '12px', textAlign: 'left', cursor: 'pointer', color: '#64748b' },
-    navActive: { padding: '12px 16px', border: 'none', backgroundColor: '#eff6ff', color: '#3b82f6', borderRadius: '12px', textAlign: 'left', fontWeight: '600' },
-    userSection: { marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #f1f5f9' },
-    userCard: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
-    userInitials: { width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#3b82f6' },
-    userName: { fontWeight: '600', fontSize: '14px' },
-    userRoleText: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' },
-    logoutBtn: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #fee2e2', color: '#ef4444', fontWeight: '600', cursor: 'pointer', background: '#fff' },
-    mainContent: { flexGrow: 1, marginLeft: '280px', padding: '48px' },
-    topHeader: { marginBottom: '32px' },
-    welcomeText: { fontSize: '28px', fontWeight: '800' },
-    subtext: { color: '#64748b' },
-    statsRow: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '48px' },
-    statCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '20px', border: '1px solid #f1f5f9' },
-    statLabel: { fontSize: '14px', fontWeight: '600', color: '#94a3b8' },
-    statValue: { fontSize: '32px', fontWeight: '800', marginTop: '4px' },
-    feedSection: { backgroundColor: '#fff', borderRadius: '24px', padding: '32px', border: '1px solid #f1f5f9' },
-    taskTable: { display: 'flex', flexDirection: 'column' },
-    taskRow: { display: 'flex', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid #f8fafc' },
-    taskTitleText: { fontWeight: '600', fontSize: '15px' },
-    taskDescriptionText: { fontSize: '13px', color: '#94a3b8' },
-    statusTag: { padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: '700' },
-    actionSelect: { padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' },
-    primaryAction: { padding: '8px 16px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
-    secondaryAction: { padding: '8px 16px', backgroundColor: '#1e293b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }
+// --- STILURI ---
+const s = {
+    container: { display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' },
+    sidebar: { width: '280px', backgroundColor: '#fff', borderRight: '1px solid #e2e8f0', padding: '30px', display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh' },
+    logoArea: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '40px' },
+    logoIcon: { backgroundColor: '#3b82f6', color: '#fff', width: '35px', height: '35px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
+    logoText: { fontSize: '20px', fontWeight: 'bold' },
+    nav: { flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '10px' },
+    navBtn: { padding: '12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', color: '#64748b', borderRadius: '10px' },
+    navActive: { padding: '12px', border: 'none', backgroundColor: '#eff6ff', color: '#3b82f6', textAlign: 'left', fontWeight: 'bold', borderRadius: '10px' },
+    userBox: { marginTop: 'auto', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' },
+    avatar: { width: '35px', height: '35px', borderRadius: '50%', backgroundColor: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
+    uName: { fontSize: '14px', fontWeight: 'bold' },
+    uRole: { fontSize: '11px', color: '#94a3b8' },
+    logout: { position: 'absolute', right: '10px', border: 'none', background: 'none', cursor: 'pointer', color: '#cbd5e1' },
+    main: { flexGrow: 1, marginLeft: '280px', padding: '50px' },
+    header: { marginBottom: '30px' },
+    title: { fontSize: '26px', fontWeight: '800', marginBottom: '5px' },
+    subtitle: { color: '#64748b' },
+    statsRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' },
+    statCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', border: '1px solid #f1f5f9' },
+    statLabel: { fontSize: '13px', color: '#94a3b8', fontWeight: 'bold' },
+    statValue: { fontSize: '28px', fontWeight: '800' },
+    card: { backgroundColor: '#fff', padding: '30px', borderRadius: '20px', border: '1px solid #f1f5f9' },
+    row: { display: 'flex', alignItems: 'center', padding: '15px 0', borderBottom: '1px solid #f8fafc' },
+    taskTitle: { fontWeight: 'bold', fontSize: '15px' },
+    taskDesc: { fontSize: '13px', color: '#94a3b8' },
+    badge: { padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' },
+    select: { padding: '5px', borderRadius: '5px', border: '1px solid #e2e8f0', fontSize: '12px' },
+    btnDone: { padding: '7px 15px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' },
+    btnClose: { padding: '7px 15px', backgroundColor: '#1e293b', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }
 };
 
 export default Dashboard;
