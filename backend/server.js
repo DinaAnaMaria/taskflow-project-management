@@ -1,4 +1,4 @@
-require('dotenv').config(); // <--- OBLIGATORIU: Prima linie!
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const sequelize = require('./config/sequelize'); 
@@ -13,34 +13,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= CONFIGURARE EMAIL (Securizată) =================
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, // <--- Citește din .env
-        pass: process.env.EMAIL_PASS  // <--- Citește din .env
-    }
-});
-
-// Stocare temporară token-uri resetare
-const resetTokens = {}; 
-
 // ================= RELAȚII BAZĂ DE DATE =================
+// Relație ierarhică User (Manager -> Executant)
+User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
+User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
+
+// Relații Proiecte și Task-uri
 User.hasMany(Project, { foreignKey: 'managerId' });
 Project.belongsTo(User, { foreignKey: 'managerId' });
-Project.hasMany(Task, { foreignKey: 'projectId' });
+
+Project.hasMany(Task, { foreignKey: 'projectId', onDelete: 'CASCADE' });
 Task.belongsTo(Project, { foreignKey: 'projectId' });
-User.hasMany(Task, { foreignKey: 'assignedTo' }); 
+
+User.hasMany(Task, { foreignKey: 'assignedTo', as: 'assignedTasks' }); 
 Task.belongsTo(User, { foreignKey: 'assignedTo', as: 'executor' }); 
 
-
-// ================= MIDDLEWARE (Securizat) =================
+// ================= MIDDLEWARE AUTH =================
 const authenticate = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Acces interzis!' });
 
-    // Folosim cheia secretă din .env
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: 'Token invalid.' });
         req.user = user;
@@ -48,31 +41,107 @@ const authenticate = (req, res, next) => {
     });
 };
 
-// ================= RUTE AUTH =================
+// ================= RUTE UTILIZATORI (ADMIN) =================
 
-app.post('/api/auth/register', async (req, res) => {
+// Adminul poate adăuga orice tip de utilizator și aloca un manager unui executant
+app.post('/api/admin/create-user', authenticate, async (req, res) => { 
+    if(req.user.role !== 'admin') return res.status(403).json({error: 'Doar adminul poate crea utilizatori'});
     try {
-        const { firstName, lastName, email, password } = req.body;
-        const existing = await User.findOne({ where: { email } });
-        if (existing) return res.status(400).json({ error: 'Email existent!' });
-
+        const { firstName, lastName, email, password, role, managerId } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        await User.create({ firstName, lastName, email, password: hashedPassword, role: 'manager' });
-
-        res.json({ message: 'Cont creat!' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        const newUser = await User.create({
+            firstName, lastName, email, password: hashedPassword, role, managerId
+        });
+        res.json({ message: 'Utilizator creat cu succes', user: newUser });
+    } catch (err) { res.status(400).json({ error: err.message }); }
 });
+
+// ================= RUTE TASK-URI (FLUX COMPLET) =================
+
+// 1. Managerul creează un task (Stare: OPEN)
+app.post('/api/tasks', authenticate, async (req, res) => {
+    if(req.user.role === 'executant') return res.status(403).json({error: 'Executanții nu pot crea task-uri'});
+    try {
+        const task = await Task.create({
+            ...req.body,
+            status: 'OPEN' // Cerință: La creare are starea OPEN
+        });
+        res.json(task);
+    } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 2. Managerul alocă task-ul (Stare: PENDING)
+app.put('/api/tasks/:id/assign', authenticate, async (req, res) => {
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Fără drepturi'});
+    try {
+        await Task.update(
+            { assignedTo: req.body.assignedTo, status: 'PENDING' }, 
+            { where: { id: req.params.id } }
+        );
+        res.json({ message: 'Task alocat, stare: PENDING' });
+    } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 3. Executantul marchează ca realizat (Stare: COMPLETED)
+app.put('/api/tasks/:id/complete', authenticate, async (req, res) => {
+    const task = await Task.findByPk(req.params.id);
+    if (!task || task.assignedTo !== req.user.id) return res.status(403).json({error: 'Nu ești alocat pe acest task'});
+    
+    await task.update({ status: 'COMPLETED' });
+    res.json({ message: 'Task realizat, stare: COMPLETED' });
+});
+
+// 4. Managerul închide task-ul (Stare: CLOSED)
+app.put('/api/tasks/:id/close', authenticate, async (req, res) => {
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Doar un manager poate închide task-ul'});
+    
+    const task = await Task.findByPk(req.params.id);
+    if(task.status !== 'COMPLETED') return res.status(400).json({error: 'Task-ul trebuie să fie COMPLETED pentru a fi închis'});
+    
+    await task.update({ status: 'CLOSED' });
+    res.json({ message: 'Task închis definitiv, stare: CLOSED' });
+});
+
+// ================= RUTE ISTORIC ȘI CONSULTARE =================
+
+// Un utilizator își vede istoricul propriu de task-uri
+app.get('/api/my-history', authenticate, async (req, res) => {
+    const tasks = await Task.findAll({
+        where: { assignedTo: req.user.id },
+        include: [Project],
+        order: [['updatedAt', 'DESC']]
+    });
+    res.json(tasks);
+});
+
+// Un manager consultă istoricul unui anumit executant
+app.get('/api/manager/history/:executantId', authenticate, async (req, res) => {
+    if(req.user.role !== 'manager' && req.user.role !== 'admin') return res.status(403).json({error: 'Fără drepturi'});
+    
+    const tasks = await Task.findAll({
+        where: { assignedTo: req.params.executantId },
+        include: [Project],
+        order: [['updatedAt', 'DESC']]
+    });
+    res.json(tasks);
+});
+
+// Vezi toți utilizatorii (util pentru formularele de alocare)
+app.get('/api/users', authenticate, async (req, res) => {
+    const users = await User.findAll({ attributes: ['id', 'firstName', 'lastName', 'role', 'managerId'] });
+    res.json(users);
+});
+
+// ================= RUTE AUTH STANDARD =================
 
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ where: { email } });
-        if (!user) return res.status(400).json({ error: 'Email inexistent.' });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(400).json({ error: 'Date invalide.' });
+        }
 
-        const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).json({ error: 'Parolă greșită.' });
-
-        // Generăm token folosind cheia din .env
         const token = jwt.sign(
             { id: user.id, role: user.role, name: `${user.firstName} ${user.lastName}` }, 
             process.env.JWT_SECRET, 
@@ -83,51 +152,7 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- FORGOT PASSWORD ---
-app.post('/api/auth/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ where: { email } });
-        if (!user) return res.status(404).json({ error: 'Email-ul nu există.' });
-
-        const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-        resetTokens[token] = user.id;
-
-        // URL Local (modifici doar când urci pe net)
-        const resetLink = `http://localhost:5173/reset-password/${token}`;
-
-        const mailOptions = {
-            from: `"TaskFlow" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Resetare Parolă',
-            html: `<p>Click aici pentru resetare: <a href="${resetLink}">Resetare Parolă</a></p>`
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ message: 'Email trimis!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Eroare trimitere email.' });
-    }
-});
-
-// --- RESET PASSWORD ---
-app.post('/api/auth/reset-password', async (req, res) => {
-    try {
-        const { token, newPassword } = req.body;
-        const userId = resetTokens[token];
-        if (!userId) return res.status(400).json({ error: 'Link invalid.' });
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await User.update({ password: hashedPassword }, { where: { id: userId } });
-        delete resetTokens[token];
-
-        res.json({ message: 'Parolă schimbată!' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ================= RUTE STANDARD (Prescurtate pentru claritate - sunt aceleași) =================
-// Setup Admin
+// Setup Admin inițial
 app.post('/api/setup-admin', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash("admin123", 10);
@@ -136,52 +161,9 @@ app.post('/api/setup-admin', async (req, res) => {
     } catch (err) { res.status(400).json({ error: "Adminul există deja." }); }
 });
 
-app.get('/api/users', authenticate, async (req, res) => { const users = await User.findAll(); res.json(users); });
-app.post('/api/admin/create-user', authenticate, async (req, res) => { 
-    if(req.user.role!=='admin') return res.status(403).json({error:'Fără drepturi'});
-    const {firstName,lastName,email,password,role} = req.body;
-    const h = await bcrypt.hash(password,10);
-    await User.create({firstName,lastName,email,password:h,role});
-    res.json({message:'User creat'});
-});
-app.delete('/api/admin/users/:id', authenticate, async (req, res) => {
-    if(req.user.role!=='admin') return res.status(403).json({error:'Fără drepturi'});
-    await Task.update({assignedTo:null, status:'OPEN'}, {where:{assignedTo:req.params.id}});
-    await User.destroy({where:{id:req.params.id}});
-    res.json({message:'User șters'});
-});
-
-app.get('/api/projects', authenticate, async (req, res) => { const projects = await Project.findAll({include: Task}); res.json(projects); });
-app.post('/api/projects', authenticate, async (req, res) => { 
-    if(req.user.role==='executant') return res.status(403).json({error:'Fără drepturi'});
-    const p = await Project.create({...req.body, managerId:req.user.id}); res.json(p);
-});
-app.delete('/api/projects/:id', authenticate, async (req, res) => {
-    if(req.user.role==='executant') return res.status(403).json({error:'Fără drepturi'});
-    await Task.destroy({where:{projectId:req.params.id}});
-    await Project.destroy({where:{id:req.params.id}});
-    res.json({message:'Proiect șters'});
-});
-
-app.get('/api/my-tasks', authenticate, async (req, res) => {
-    const tasks = await Task.findAll({where:{assignedTo:req.user.id}, include:[{model:Project, attributes:['name']}], order:[['updatedAt','DESC']]});
-    res.json(tasks);
-});
-app.get('/api/tasks/project/:projectId', authenticate, async (req, res) => {
-    const tasks = await Task.findAll({where:{projectId:req.params.projectId}, include:[{model:User, as:'executor', attributes:['firstName','lastName']}]});
-    res.json(tasks);
-});
-app.post('/api/tasks', authenticate, async (req, res) => {
-    if(req.user.role==='executant') return res.status(403).json({error:'Fără drepturi'});
-    const t = await Task.create({...req.body, status:'OPEN'}); res.json(t);
-});
-app.put('/api/tasks/:id/assign', authenticate, async (req, res) => { await Task.update({assignedTo:req.body.assignedTo, status:'PENDING'}, {where:{id:req.params.id}}); res.json({message:'Alocat'}); });
-app.put('/api/tasks/:id/complete', authenticate, async (req, res) => { await Task.update({status:'COMPLETED'}, {where:{id:req.params.id}}); res.json({message:'Finalizat'}); });
-app.put('/api/tasks/:id/close', authenticate, async (req, res) => { await Task.update({status:'CLOSED'}, {where:{id:req.params.id}}); res.json({message:'Închis'}); });
-
-// START SERVER (Folosind PORT din .env)
+// START SERVER
 const PORT = process.env.PORT || 8080;
 sequelize.sync({ alter: true }).then(() => {
-    console.log('✅ Baza de date sincronizată.');
+    console.log('✅ Baza de date sincronizată cu noile cerințe.');
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 });
