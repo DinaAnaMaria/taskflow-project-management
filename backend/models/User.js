@@ -49,7 +49,7 @@ const User = sequelize.define('User', {
 });
 
 // Definirea relației de subordonare (Manager has many Executanți)
-User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
-User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
+//User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
+//User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
 
 module.exports = User;
