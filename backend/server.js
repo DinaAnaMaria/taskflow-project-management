@@ -183,7 +183,7 @@ app.post('/api/admin/create-user', authenticate, async (req, res) => {
 
 // START SERVER
 const PORT = process.env.PORT || 8080;
-sequelize.sync({ alter: true }).then(() => {
+sequelize.sync({ force: true }).then(() => {
     console.log('✅ Server sincronizat cu Render și CleverCloud.');
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 });
