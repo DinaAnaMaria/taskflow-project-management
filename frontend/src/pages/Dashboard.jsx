@@ -15,6 +15,8 @@ const Dashboard = () => {
     const [newProject, setNewProject] = useState({ name: '', description: '' });
     const [newTask, setNewTask] = useState({ title: '', description: '', projectId: '' });
 
+    const [searchTerm, setSearchTerm] = useState('');
+
     const user = JSON.parse(localStorage.getItem('user')) || {};
     const token = localStorage.getItem('token');
     const API_URL = "https://taskflow-api-qkmb.onrender.com/api"; 
@@ -89,7 +91,19 @@ const handleDeleteProject = async (projectId) => {
 
 
     const allTasks = projects.flatMap(p => p.Tasks || []);
-    const historyTasks = allTasks.filter(t => t.status === 'CLOSED');
+    // Filtrăm task-urile închise (CLOSED) și aplicăm căutarea după numele executantului
+const historyTasks = allTasks.filter(t => {
+    if (t.status !== 'CLOSED') return false;
+    
+    // Dacă nu există căutare, returnăm tot istoricul
+    if (!searchTerm) return true;
+    
+    // Găsim executantul pentru a-i verifica numele
+    const assignee = users.find(u => u.id === t.assignedTo);
+    const fullName = `${assignee?.firstName} ${assignee?.lastName}`.toLowerCase();
+    
+    return fullName.includes(searchTerm.toLowerCase());
+});
     const activeTasks = allTasks.filter(t => t.status !== 'CLOSED');
 
     return (
@@ -124,6 +138,24 @@ const handleDeleteProject = async (projectId) => {
                         </div>
                     )}
                 </header>
+
+                {activeTab === 'history' && (
+                    <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ position: 'relative', flexGrow: 1 }}>
+                            <span style={{ position: 'absolute', left: '15px', top: '12px' }}>🔍</span>
+                            <input 
+                                type="text" 
+                                placeholder="Caută istoricul unui executant după nume..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={s.searchInput}
+                            />
+                        </div>
+                        {searchTerm && (
+                            <button onClick={() => setSearchTerm('')} style={s.clearBtn}>Clear</button>
+                        )}
+                    </div>
+                )}
 
                 {activeTab === 'overview' && user.role === 'manager' && (
     <div style={s.projectGrid}>
@@ -301,6 +333,30 @@ const s = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
+    },
+    searchInput: {
+        width: '100%',
+        padding: '14px 14px 14px 44px', // Spațiu mai mare în stânga pentru iconiță
+        borderRadius: '14px',
+        border: '1px solid #E2E8F0',
+        backgroundColor: '#FFF',
+        fontSize: '14px',
+        outline: 'none',
+        color: '#1B2559',
+        fontWeight: '500',
+        transition: '0.3s',
+        boxShadow: '0px 4px 12px rgba(0,0,0,0.03)'
+    },
+    clearBtn: {
+        background: '#F4F7FE',
+        border: 'none',
+        color: '#4318FF',
+        padding: '10px 18px',
+        borderRadius: '12px',
+        fontWeight: '700',
+        cursor: 'pointer',
+        fontSize: '13px',
+        transition: '0.2s'
     }
 };
 
