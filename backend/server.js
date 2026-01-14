@@ -12,22 +12,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= RELAȚII BAZĂ DE DATE (VERSIUNEA FINALĂ FĂRĂ ERORI) =================
-// 1. Relația ierarhică (Manager -> Subordonați)
+// ================= RELAȚII BAZĂ DE DATE =================
 User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
 User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
 
-// 2. Relația Proiecte (Manager -> Proiecte)
 User.hasMany(Project, { foreignKey: 'managerId' });
 Project.belongsTo(User, { foreignKey: 'managerId' });
 
-// 3. Relația Task-uri (Proiect -> Task-uri)
 Project.hasMany(Task, { foreignKey: 'projectId', onDelete: 'CASCADE' });
 Task.belongsTo(Project, { foreignKey: 'projectId' });
 
-// 4. Relația Execuție (Task -> Executant)
 User.hasMany(Task, { foreignKey: 'assignedTo', as: 'assignedTasks' }); 
 Task.belongsTo(User, { foreignKey: 'assignedTo', as: 'executor' });
+
+// IMPORTANT: Adăugăm relația pentru Creatorul Task-ului
+User.hasMany(Task, { foreignKey: 'creatorId', as: 'createdTasks' });
+Task.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
 
 // ================= MIDDLEWARE AUTH =================
 const authenticate = (req, res, next) => {
@@ -42,8 +42,7 @@ const authenticate = (req, res, next) => {
     });
 };
 
-// ================= RUTA SETUP ADMIN (FIX) =================
-// Folosim GET pentru a putea fi accesată direct din browser
+// ================= RUTA SETUP ADMIN =================
 app.get('/api/setup-admin', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash("admin123", 10);
@@ -80,17 +79,27 @@ app.get('/api/projects', authenticate, async (req, res) => {
 app.post('/api/projects', authenticate, async (req, res) => {
     if (req.user.role === 'executant') return res.status(403).json({ error: 'Fără drepturi' });
     try {
-        const project = await Project.create({ ...req.body, managerId: req.user.id });
+        const project = await Project.create({ 
+            name: req.body.name, 
+            description: req.body.description,
+            managerId: req.user.id 
+        });
         res.json(project);
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// ================= RUTE TASK-URI =================
-
+// ================= RUTE TASK-URI (CORECTATĂ) =================
 app.post('/api/tasks', authenticate, async (req, res) => {
     if(req.user.role === 'executant') return res.status(403).json({error: 'Executanții nu pot crea task-uri'});
     try {
-        const task = await Task.create({ ...req.body, status: 'OPEN' });
+        // FIX: Ne asigurăm că creatorId este salvat folosind ID-ul din token (req.user.id)
+        const task = await Task.create({ 
+            title: req.body.title,
+            description: req.body.description,
+            projectId: req.body.projectId,
+            creatorId: req.user.id, // Preluat din JWT
+            status: 'OPEN' 
+        });
         res.json(task);
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -134,7 +143,6 @@ app.put('/api/tasks/:id/close', authenticate, async (req, res) => {
 });
 
 // ================= RUTE CONSULTARE =================
-
 app.get('/api/users', authenticate, async (req, res) => {
     try {
         const users = await User.findAll({ 
@@ -168,14 +176,20 @@ app.post('/api/admin/create-user', authenticate, async (req, res) => {
     try {
         const { firstName, lastName, email, password, role, managerId } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await User.create({ firstName, lastName, email, password: hashedPassword, role, managerId });
+        const newUser = await User.create({ 
+            firstName, 
+            lastName, 
+            email, 
+            password: hashedPassword, 
+            role, 
+            managerId: managerId || null 
+        });
         res.json({ message: 'Utilizator creat cu succes', user: newUser });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 // START SERVER
 const PORT = process.env.PORT || 8080;
-// Folosim alter: true pentru a nu sterge datele la fiecare restart
 sequelize.sync({ alter: true }).then(() => {
     console.log('✅ Baza de date sincronizata.');
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

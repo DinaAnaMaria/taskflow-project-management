@@ -53,20 +53,25 @@ const Dashboard = () => {
     // FUNCTIE CREARE TASK
     const handleCreateTask = async (e) => {
     e.preventDefault();
-    console.log("Date trimise la server:", newTask); // VEZI ASTA ÎN CONSOLĂ (F12)
     
-    if (!newTask.projectId) {
-        alert("Te rugăm să selectezi un proiect din listă!");
-        return;
-    }
+    // Extragem ID-ul managerului logat
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    const taskData = { 
+        ...newTask, 
+        status: 'OPEN',
+        creatorId: user.id // FIX: Trimitem ID-ul celui care creează task-ul
+    };
 
     try {
-        await axios.post(`${API_URL}/tasks`, { ...newTask, status: 'OPEN' }, { headers });
-        alert("Sarcina a fost lansată!");
-        // ... restul codului
-    } catch (err) {
+        await axios.post(`${API_URL}/tasks`, taskData, { headers });
+        alert("Sarcina a fost lansată cu succes!");
+        setShowTaskForm(false);
+        setNewTask({ title: '', description: '', projectId: '' });
+        fetchData();
+    } catch (err) { 
         console.error("Eroare detaliată:", err.response?.data);
-        alert("Eroare: " + (err.response?.data?.error || "Verifică consola"));
+        alert("Eroare: " + (err.response?.data?.error || "Verifică datele")); 
     }
 };
 
