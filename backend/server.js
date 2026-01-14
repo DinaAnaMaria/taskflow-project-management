@@ -177,17 +177,23 @@ app.post('/api/projects', authenticate, async (req, res) => {
 
 
 app.post('/api/tasks', authenticate, async (req, res) => {
-
+    // Verificăm dacă cel care face cererea este executant (ei nu au voie să creeze)
     if(req.user.role === 'executant') return res.status(403).json({error: 'Executanții nu pot crea task-uri'});
-
+    
     try {
-
-        const task = await Task.create({ ...req.body, status: 'OPEN' });
-
+        // Luăm datele trimise din frontend (title, description, projectId)
+        // Și adăugăm automat creatorId din token-ul managerului logat
+        const task = await Task.create({ 
+            title: req.body.title,
+            description: req.body.description,
+            projectId: req.body.projectId,
+            creatorId: req.user.id, // ACESTA ESTE REZOLVAREA PENTRU EROARE
+            status: 'OPEN' 
+        });
         res.json(task);
-
-    } catch (err) { res.status(400).json({ error: err.message }); }
-
+    } catch (err) { 
+        res.status(400).json({ error: err.message }); 
+    }
 });
 
 
