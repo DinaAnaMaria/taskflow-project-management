@@ -18,7 +18,10 @@ const User = sequelize.define('User', {
     email: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true
+        unique: true,
+        validate: {
+            isEmail: true // Validare extra pentru siguranță
+        }
     },
     password: {
         type: DataTypes.STRING,
@@ -31,11 +34,22 @@ const User = sequelize.define('User', {
     },
     managerId: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+            model: 'Users', // Se referă la aceeași tabelă
+            key: 'id'
+        }
     },
     avatar: {
-        type: DataTypes.STRING
+        type: DataTypes.STRING,
+        allowNull: true
     }
+}, {
+    timestamps: true // Adaugă automat createdAt și updatedAt, util pentru istoric
 });
+
+// Definirea relației de subordonare (Manager has many Executanți)
+User.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
+User.hasMany(User, { as: 'subordinates', foreignKey: 'managerId' });
 
 module.exports = User;
