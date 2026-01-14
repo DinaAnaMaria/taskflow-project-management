@@ -39,3 +39,4 @@ const AdminUserCreate = () => {
     </form>
   );
 };
+export default Dashboard;
